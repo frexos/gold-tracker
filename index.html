@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" id="root">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,8 +23,15 @@
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
   h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
   .sub { color: var(--muted); margin: 0 0 24px; }
+  .lang-btn {
+    background: transparent; border: 1px solid var(--line); border-radius: 8px;
+    color: var(--muted); font: inherit; font-size: 13px; padding: 5px 10px;
+    cursor: pointer; flex-shrink: 0; margin-top: 2px;
+  }
+  .lang-btn:hover { color: var(--text); border-color: var(--muted); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
   .tile .label { color: var(--muted); font-size: 13px; }
@@ -49,27 +56,32 @@
 </head>
 <body>
 <main>
-  <h1>Gold Sovereign Tracker</h1>
-  <p class="sub" id="updated">Loading…</p>
+  <div class="header-row">
+    <div>
+      <h1 id="page-title">Gold Sovereign Tracker</h1>
+      <p class="sub" id="updated">Loading…</p>
+    </div>
+    <button id="lang-btn" class="lang-btn">ΕΛ</button>
+  </div>
 
   <div class="tiles">
     <div class="tile main">
-      <div class="label">Sovereign gold value</div>
+      <div class="label" data-i18n="sovLabel">Sovereign gold value</div>
       <div class="value" id="t-sov">–</div>
       <div class="note" id="t-sov-chg"></div>
     </div>
     <div class="tile sell">
-      <div class="label">Est. price if you sell</div>
+      <div class="label" data-i18n="sellLabel">Est. price if you sell</div>
       <div class="value" id="t-sell">–</div>
-      <div class="note">what a bank would pay you</div>
+      <div class="note" data-i18n="sellNote">what a bank would pay you</div>
     </div>
     <div class="tile buy">
-      <div class="label">Est. price if you buy</div>
+      <div class="label" data-i18n="buyLabel">Est. price if you buy</div>
       <div class="value" id="t-buy">–</div>
-      <div class="note">what a bank would charge you</div>
+      <div class="note" data-i18n="buyNote">what a bank would charge you</div>
     </div>
     <div class="tile">
-      <div class="label">Gold per troy ounce</div>
+      <div class="label" data-i18n="ozLabel">Gold per troy ounce</div>
       <div class="value" id="t-oz">–</div>
       <div class="note" id="t-usd"></div>
     </div>
@@ -82,30 +94,101 @@
         <button data-days="90">3M</button>
         <button data-days="365">1Y</button>
         <button data-days="1826">5Y</button>
-        <button data-days="0" class="on">All</button>
+        <button data-days="0" class="on" data-i18n="all">All</button>
       </div>
       <div class="seg" id="series">
-        <button data-s="sov" class="on">Sovereign €</button>
-        <button data-s="oz">Gold €/oz</button>
+        <button data-s="sov" class="on" data-i18n="seriesSov">Sovereign €</button>
+        <button data-s="oz" data-i18n="seriesOz">Gold €/oz</button>
       </div>
     </div>
     <div class="chart-box"><canvas id="chart"></canvas></div>
-    <div class="empty" id="empty" hidden>No data yet. The first price appears after the workflow runs.</div>
+    <div class="empty" id="empty" hidden data-i18n="noData">No data yet. The first price appears after the workflow runs.</div>
   </div>
 
   <footer>
-    <p>A sovereign holds 7.3224 g of fine gold (0.23542 troy oz). Its value here is gold price × 0.23542.</p>
-    <p>Buy and sell figures are estimates based on the Bank of Greece's typical spread, not official quotes. Check the Bank of Greece or Piraeus Bank before trading.</p>
-    <p>Gold: API Ninjas (daily updates), Free Gold API (history, monthly before 2025). EUR rate: ECB via Frankfurter. Updated once a day.</p>
+    <p data-i18n="footer1">A sovereign holds 7.3224 g of fine gold (0.23542 troy oz). Its value here is gold price × 0.23542.</p>
+    <p data-i18n="footer2">Buy and sell figures are estimates based on the Bank of Greece's typical spread, not official quotes. Check the Bank of Greece or Piraeus Bank before trading.</p>
+    <p data-i18n="footer3">Gold: API Ninjas (daily updates), Free Gold API (history, monthly before 2025). EUR rate: ECB via Frankfurter. Updated once a day.</p>
   </footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-  // Settings you may want to tweak
   const OZ_PER_SOVEREIGN = 0.23542;
-  const SELL_FACTOR = 0.96;   // bank pays you ~4% under gold value
-  const BUY_FACTOR = 1.125;   // bank charges ~12.5% over gold value
+  const SELL_FACTOR = 0.96;
+  const BUY_FACTOR = 1.125;
+
+  const STRINGS = {
+    en: {
+      title: "Gold Sovereign Tracker",
+      loading: "Loading…",
+      waiting: "Waiting for the first update.",
+      lastUpdate: "Last update:",
+      sovLabel: "Sovereign gold value",
+      sellLabel: "Est. price if you sell",
+      sellNote: "what a bank would pay you",
+      buyLabel: "Est. price if you buy",
+      buyNote: "what a bank would charge you",
+      ozLabel: "Gold per troy ounce",
+      inDollars: "in dollars",
+      all: "All",
+      seriesSov: "Sovereign €",
+      seriesOz: "Gold €/oz",
+      noData: "No data yet. The first price appears after the workflow runs.",
+      sinceUpdate: "since previous update",
+      footer1: "A sovereign holds 7.3224 g of fine gold (0.23542 troy oz). Its value here is gold price × 0.23542.",
+      footer2: "Buy and sell figures are estimates based on the Bank of Greece’s typical spread, not official quotes. Check the Bank of Greece or Piraeus Bank before trading.",
+      footer3: "Gold: API Ninjas (daily updates), Free Gold API (history, monthly before 2025). EUR rate: ECB via Frankfurter. Updated once a day.",
+    },
+    el: {
+      title: "Χρυσή Λίρα Αγγλίας",
+      loading: "Φόρτωση…",
+      waiting: "Αναμονή για την πρώτη ενημέρωση.",
+      lastUpdate: "Τελευταία ενημέρωση:",
+      sovLabel: "Αξία χρυσής λίρας",
+      sellLabel: "Εκτιμ. τιμή αν πουλήσετε",
+      sellNote: "τιμή αγοράς τράπεζας",
+      buyLabel: "Εκτιμ. τιμή αν αγοράσετε",
+      buyNote: "τιμή πώλησης τράπεζας",
+      ozLabel: "Χρυσός ανά τρόι ουγγιά",
+      inDollars: "σε δολάρια",
+      all: "Όλα",
+      seriesSov: "Λίρα €",
+      seriesOz: "Χρυσός €/oz",
+      noData: "Δεν υπάρχουν δεδομένα. Η πρώτη τιμή θα εμφανιστεί μετά την εκτέλεση.",
+      sinceUpdate: "από την προηγούμενη ενημέρωση",
+      footer1: "Η χρυσή λίρα περιέχει 7,3224 g καθαρού χρυσού (0,23542 τρόι ουγγιές). Η αξία υπολογίζεται ως τιμή χρυσού × 0,23542.",
+      footer2: "Οι τιμές αγοράς και πώλησης είναι εκτιμήσεις βάσει του τυπικού περιθωρίου της Τράπεζας της Ελλάδος, όχι επίσημες τιμές. Ελέγξτε την Τράπεζα της Ελλάδος ή την Τράπεζα Πειραιώς πριν συναλλαγείτε.",
+      footer3: "Χρυσός: API Ninjas (ημερήσιες ενημερώσεις), Free Gold API (ιστορικό, μηνιαία πριν το 2025). Ισοτιμία EUR: ΕΚΤ μέσω Frankfurter. Ενημέρωση μία φορά την ημέρα.",
+    },
+  };
+
+  let lang = (() => { try { return localStorage.getItem("gt-lang") || "en"; } catch { return "en"; } })();
+
+  const t = (k) => STRINGS[lang][k];
+
+  function applyLang() {
+    document.getElementById("root").lang = lang;
+    document.getElementById("page-title").textContent = t("title");
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.dataset.i18n;
+      if (STRINGS[lang][key] !== undefined) el.textContent = STRINGS[lang][key];
+    });
+    document.getElementById("lang-btn").textContent = lang === "en" ? "ΕΛ" : "EN";
+    if (!rows.length) {
+      const upd = document.getElementById("updated");
+      if (upd.textContent === STRINGS.en.loading || upd.textContent === STRINGS.el.loading) {
+        upd.textContent = t("loading");
+      }
+    }
+    try { localStorage.setItem("gt-lang", lang); } catch {}
+  }
+
+  document.getElementById("lang-btn").addEventListener("click", () => {
+    lang = lang === "en" ? "el" : "en";
+    applyLang();
+    if (rows.length) fillTiles();
+  });
 
   const eur = (n) => n.toLocaleString("el-GR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
   const usd = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -130,14 +213,15 @@
     document.getElementById("t-sell").textContent = eur(sov * SELL_FACTOR);
     document.getElementById("t-buy").textContent = eur(sov * BUY_FACTOR);
     document.getElementById("t-oz").textContent = eur(last.gold_eur_oz);
-    document.getElementById("t-usd").textContent = usd(last.gold_usd_oz) + " in dollars";
+    document.getElementById("t-usd").textContent = usd(last.gold_usd_oz) + " " + t("inDollars");
+    const locale = lang === "el" ? "el-GR" : "en-GB";
     document.getElementById("updated").textContent =
-      "Last update: " + new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      t("lastUpdate") + " " + new Date(last.date).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
     if (rows.length > 1) {
       const prev = rows[rows.length - 2].gold_eur_oz * OZ_PER_SOVEREIGN;
       const pct = ((sov - prev) / prev) * 100;
       document.getElementById("t-sov-chg").textContent =
-        (pct >= 0 ? "▲ " : "▼ ") + Math.abs(pct).toFixed(2) + "% since previous update";
+        (pct >= 0 ? "▲ " : "▼ ") + Math.abs(pct).toFixed(2) + "% " + t("sinceUpdate");
     }
   }
 
@@ -187,12 +271,14 @@
   bind("range", "days", (v) => (days = Number(v)));
   bind("series", "s", (v) => (series = v));
 
+  applyLang();
+
   fetch("prices.csv", { cache: "no-store" })
     .then((r) => (r.ok ? r.text() : ""))
     .then((t) => {
       rows = t ? parseCsv(t) : [];
       if (!rows.length) {
-        document.getElementById("updated").textContent = "Waiting for the first update.";
+        document.getElementById("updated").textContent = STRINGS[lang].waiting;
         document.querySelector(".chart-box").hidden = true;
         document.getElementById("empty").hidden = false;
         return;

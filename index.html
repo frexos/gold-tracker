@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold Sovereign Tracker</title>
+<style>
+  :root {
+    --bg: #faf8f3; --card: #ffffff; --text: #1c1a16; --muted: #6b665c;
+    --line: #e6e1d6; --gold: #b8860b; --gold-soft: rgba(184,134,11,.12);
+    --buy: #2f6f4f; --sell: #9a3b2e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141310; --card: #1d1b17; --text: #ece7dc; --muted: #9b958a;
+      --line: #2e2b25; --gold: #e0b04a; --gold-soft: rgba(224,176,74,.14);
+      --buy: #6cbf93; --sell: #e08a7c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .label { color: var(--muted); font-size: 13px; }
+  .tile .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .note { color: var(--muted); font-size: 12px; }
+  .tile.main .value { color: var(--gold); }
+  .tile.buy .value { color: var(--buy); }
+  .tile.sell .value { color: var(--sell); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--muted); border: 0; padding: 6px 12px; font: inherit; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--gold-soft); color: var(--text); font-weight: 600; }
+  .chart-box { position: relative; height: 360px; }
+  .empty { color: var(--muted); text-align: center; padding: 80px 16px; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 18px; }
+  footer p { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Gold Sovereign Tracker</h1>
+  <p class="sub" id="updated">Loading…</p>
+
+  <div class="tiles">
+    <div class="tile main">
+      <div class="label">Sovereign gold value</div>
+      <div class="value" id="t-sov">–</div>
+      <div class="note" id="t-sov-chg"></div>
+    </div>
+    <div class="tile sell">
+      <div class="label">Est. price if you sell</div>
+      <div class="value" id="t-sell">–</div>
+      <div class="note">what a bank would pay you</div>
+    </div>
+    <div class="tile buy">
+      <div class="label">Est. price if you buy</div>
+      <div class="value" id="t-buy">–</div>
+      <div class="note">what a bank would charge you</div>
+    </div>
+    <div class="tile">
+      <div class="label">Gold per troy ounce</div>
+      <div class="value" id="t-oz">–</div>
+      <div class="note" id="t-usd"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="seg" id="range">
+        <button data-days="30">1M</button>
+        <button data-days="90">3M</button>
+        <button data-days="365">1Y</button>
+        <button data-days="1826">5Y</button>
+        <button data-days="0" class="on">All</button>
+      </div>
+      <div class="seg" id="series">
+        <button data-s="sov" class="on">Sovereign €</button>
+        <button data-s="oz">Gold €/oz</button>
+      </div>
+    </div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+    <div class="empty" id="empty" hidden>No data yet. The first price appears after the workflow runs.</div>
+  </div>
+
+  <footer>
+    <p>A sovereign holds 7.3224 g of fine gold (0.23542 troy oz). Its value here is gold price × 0.23542.</p>
+    <p>Buy and sell figures are estimates based on the Bank of Greece's typical spread, not official quotes. Check the Bank of Greece or Piraeus Bank before trading.</p>
+    <p>Gold: API Ninjas (daily updates), Free Gold API (history, monthly before 2025). EUR rate: ECB via Frankfurter. Updated once a day.</p>
+  </footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  // Settings you may want to tweak
+  const OZ_PER_SOVEREIGN = 0.23542;
+  const SELL_FACTOR = 0.96;   // bank pays you ~4% under gold value
+  const BUY_FACTOR = 1.125;   // bank charges ~12.5% over gold value
+
+  const eur = (n) => n.toLocaleString("el-GR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  const usd = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  let rows = [], chart, days = 0, series = "sov";
+
+  function parseCsv(text) {
+    const [head, ...lines] = text.trim().split(/\r?\n/);
+    const keys = head.split(",");
+    return lines.filter(Boolean).map((l) => {
+      const v = l.split(","), o = {};
+      keys.forEach((k, i) => (o[k] = k === "date" ? v[i] : parseFloat(v[i])));
+      return o;
+    });
+  }
+
+  function fillTiles() {
+    const last = rows[rows.length - 1];
+    const sov = last.gold_eur_oz * OZ_PER_SOVEREIGN;
+    document.getElementById("t-sov").textContent = eur(sov);
+    document.getElementById("t-sell").textContent = eur(sov * SELL_FACTOR);
+    document.getElementById("t-buy").textContent = eur(sov * BUY_FACTOR);
+    document.getElementById("t-oz").textContent = eur(last.gold_eur_oz);
+    document.getElementById("t-usd").textContent = usd(last.gold_usd_oz) + " in dollars";
+    document.getElementById("updated").textContent =
+      "Last update: " + new Date(last.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    if (rows.length > 1) {
+      const prev = rows[rows.length - 2].gold_eur_oz * OZ_PER_SOVEREIGN;
+      const pct = ((sov - prev) / prev) * 100;
+      document.getElementById("t-sov-chg").textContent =
+        (pct >= 0 ? "▲ " : "▼ ") + Math.abs(pct).toFixed(2) + "% since previous update";
+    }
+  }
+
+  function draw() {
+    let data = rows;
+    if (days > 0) {
+      const cutoff = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+      data = rows.filter((r) => r.date >= cutoff);
+    }
+    const values = data.map((r) => series === "sov" ? r.gold_eur_oz * OZ_PER_SOVEREIGN : r.gold_eur_oz);
+    const gold = css("--gold"), line = css("--line"), muted = css("--muted");
+
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels: data.map((r) => r.date),
+        datasets: [{
+          data: values, borderColor: gold, backgroundColor: css("--gold-soft"),
+          fill: true, borderWidth: 2, tension: 0.2, pointRadius: data.length < 40 ? 3 : 0, pointHoverRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => eur(c.parsed.y) } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: muted, maxTicksLimit: 8 } },
+          y: { grid: { color: line }, ticks: { color: muted, callback: (v) => eur(v) } },
+        },
+      },
+    });
+  }
+
+  function bind(id, attr, setter) {
+    document.getElementById(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle("on", x === b));
+      setter(b.dataset[attr]);
+      if (rows.length) draw();
+    });
+  }
+  bind("range", "days", (v) => (days = Number(v)));
+  bind("series", "s", (v) => (series = v));
+
+  fetch("prices.csv", { cache: "no-store" })
+    .then((r) => (r.ok ? r.text() : ""))
+    .then((t) => {
+      rows = t ? parseCsv(t) : [];
+      if (!rows.length) {
+        document.getElementById("updated").textContent = "Waiting for the first update.";
+        document.querySelector(".chart-box").hidden = true;
+        document.getElementById("empty").hidden = false;
+        return;
+      }
+      fillTiles();
+      draw();
+    });
+
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => rows.length && draw());
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+name: Update gold price
+
+on:
+  schedule:
+    - cron: "23 7 * * *"   # 07:23 UTC daily
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch today's price
+        env:
+          GOLD_API_KEY: ${{ secrets.GOLD_API_KEY }}
+        run: python3 scripts/fetch_price.py
+
+      - name: Commit updated CSV
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/prices.csv
+          git diff --cached --quiet || git commit -m "price: $(date -u +%Y-%m-%d)"
+
+      - name: Push
+        run: git push
+
+      - name: Build site
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+          cp data/prices.csv _site/prices.csv
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

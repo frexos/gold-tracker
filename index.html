@@ -90,11 +90,11 @@
   <div class="card">
     <div class="toolbar">
       <div class="seg" id="range">
-        <button data-days="30">1M</button>
+        <button data-days="30" class="on">1M</button>
         <button data-days="90">3M</button>
         <button data-days="365">1Y</button>
         <button data-days="1826">5Y</button>
-        <button data-days="0" class="on" data-i18n="all">All</button>
+        <button data-days="0" data-i18n="all">All</button>
       </div>
       <div class="seg" id="series">
         <button data-s="sov" class="on" data-i18n="seriesSov">Sovereign €</button>
@@ -150,7 +150,7 @@
       sellNote: "τιμή αγοράς τράπεζας",
       buyLabel: "Εκτιμ. τιμή αν αγοράσετε",
       buyNote: "τιμή πώλησης τράπεζας",
-      ozLabel: "Χρυσός ανά τρόι ουγγιά",
+      ozLabel: "Χρυσός ανά ουγγιά",
       inDollars: "σε δολάρια",
       all: "Όλα",
       seriesSov: "Λίρα €",
@@ -194,7 +194,7 @@
   const usd = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
-  let rows = [], chart, days = 0, series = "sov";
+  let rows = [], chart, days = 30, series = "sov";
 
   function parseCsv(text) {
     const [head, ...lines] = text.trim().split(/\r?\n/);
